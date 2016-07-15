@@ -184,8 +184,9 @@ class FrontendApplication:
                     event, root = doc.next()
                     num = 0
                     for event, elem in doc:
-                        if event == "end" and elem.tag == "game":
+                        if event == "end" and elem.tag == "machine":
                             name = elem.get("name")
+			    runn = elem.get("runnable")
                             if not os.path.exists(os.path.join(self.configuration["romsFolder"], name + ".zip")):
                                 root.clear()
                                 continue
@@ -199,7 +200,18 @@ class FrontendApplication:
                                 status = driver.get("status") or ""
                             game = Game(name=name, description=desc, year=year, manufacturer=manu, status=status,
                                     cloneof=clone)
-                            session.add(game)
+			    devs = elem.findall("device")
+			    getthis = True
+			    # filter our computers, gaming consoles, etc.
+			    if devs:
+				for dd in devs:
+				    if dd.attrib["type"] in ("floppydisk", "cassette", "cartridge"):
+					getthis = False
+			    # look for peripherals
+			    if runn == "no":
+				getthis = False
+			    if getthis:
+                                session.add(game)
                             if num >= 200:
                                 session.commit()
                                 num = 0
@@ -238,7 +250,9 @@ class FrontendApplication:
         self.setGameImage(game)
 
     def setGameImage(self, game):
-        path = os.path.join(self.configuration["snapsFolder"], game["game_name"] + ".png")
+        path = os.path.join("/home/martin/.attract/scraper/mame/snap", game["game_name"] + ".png")
+        if not os.path.exists(path):
+            path = os.path.join(self.configuration["snapsFolder"], game["game_name"], "0000.png")
         if not os.path.exists(path):
             pix = None
             clone = game["game_cloneof"]
