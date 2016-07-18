@@ -48,6 +48,9 @@ confFile = os.path.join(data_directory, "conf.json")
 cstring = "sqlite:///" + os.path.join(data_directory, "db.sqlite")
 engine = sqlalchemy.create_engine(cstring, poolclass=SingletonThreadPool)
 
+# scrape sreenshots from mamedb:
+scrape = True
+
 # Some helpers to help use SqlAlchemy
 class Base(object):
     @sqlalchemy.ext.declarative.declared_attr
@@ -250,8 +253,13 @@ class FrontendApplication:
         self.setGameImage(game)
 
     def setGameImage(self, game):
-        path = os.path.join("/home/martin/.attract/scraper/mame/snap", game["game_name"] + ".png")
+	snapdir = "/home/martin/.attract/scraper/mame/snap"
+
+        path = os.path.join(snapdir, game["game_name"] + ".png")
         if not os.path.exists(path):
+	    cmd = "curl -fLo %s mamedb.com/snap/%s.png" % (path, game["game_name"])
+	    if scrape:
+		os.system(cmd)
             path = os.path.join(self.configuration["snapsFolder"], game["game_name"], "0000.png")
         if not os.path.exists(path):
             pix = None
