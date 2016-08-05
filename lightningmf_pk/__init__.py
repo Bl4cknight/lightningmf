@@ -122,7 +122,13 @@ class FrontendApplication:
         self.win.show()
         
         self.model = MyModel()
-        self.win.itemsView.setModel(self.model)
+
+	#http://stackoverflow.com/questions/11606259/how-to-sort-a-qtableview-by-a-column
+	self.proxyModel = QtGui.QSortFilterProxyModel()
+	self.proxyModel.setSourceModel(self.model)
+
+        self.win.itemsView.setModel(self.proxyModel)
+	self.win.itemsView.setSortingEnabled(True)
         self.win.itemsView.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
         self.win.itemsView.doubleClicked.connect(self.launchGame)
         x = self.win.itemsView.selectionModel()
@@ -237,8 +243,9 @@ class FrontendApplication:
         selected = self.win.itemsView.selectedIndexes()
         if len(selected) == 0:
             return
-        selected = selected[0].row()
-        return self.model._getRow(selected)
+        selected = selected[0]
+	index = self.proxyModel.mapSelectionToSource(QtGui.QItemSelection(selected, selected)).indexes()[0]
+        return self.model._getRow(index.row())
 
     def launchGame(self):
         game = self._getSelected()
