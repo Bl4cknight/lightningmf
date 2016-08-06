@@ -129,6 +129,7 @@ class FrontendApplication:
 
         self.win.itemsView.setModel(self.proxyModel)
 	self.win.itemsView.setSortingEnabled(True)
+	self.win.itemsView.sortByColumn(0, QtCore.Qt.SortOrder(0))
         self.win.itemsView.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
         self.win.itemsView.doubleClicked.connect(self.launchGame)
         x = self.win.itemsView.selectionModel()
