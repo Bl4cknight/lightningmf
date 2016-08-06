@@ -75,6 +75,7 @@ class Game(Base):
     manufacturer = Column(String(70), nullable=False)
     status = Column(String(50), nullable=False)
     cloneof = Column(String(50))
+    rating = Column(String(10))
 
 # session
 
@@ -132,6 +133,7 @@ class FrontendApplication:
 	self.win.itemsView.sortByColumn(0, QtCore.Qt.SortOrder(0))
         self.win.itemsView.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
         self.win.itemsView.doubleClicked.connect(self.launchGame)
+	self.win.rating.valueChanged.connect(self.setrating)
         x = self.win.itemsView.selectionModel()
         x.selectionChanged.connect(self.selectionChanged)
         def set_number():
@@ -209,7 +211,7 @@ class FrontendApplication:
                             if driver is not None:
                                 status = driver.get("status") or ""
                             game = Game(name=name, description=desc, year=year, manufacturer=manu, status=status,
-                                    cloneof=clone)
+                                    cloneof=clone, rating = "1")
 			    devs = elem.findall("device")
 			    getthis = True
 			    # filter our computers, gaming consoles, etc.
@@ -241,12 +243,25 @@ class FrontendApplication:
         self.model.modelReset.emit()
 
     def _getSelected(self):
+	global cursel
+
         selected = self.win.itemsView.selectedIndexes()
         if len(selected) == 0:
             return
         selected = selected[0]
+	cursel = selected
 	index = self.proxyModel.mapSelectionToSource(QtGui.QItemSelection(selected, selected)).indexes()[0]
         return self.model._getRow(index.row())
+
+    def setrating(self, value):
+	game = curgame
+	game["game_rating"] = "%u" % value
+	session.begin()
+	result = session.query(Game).filter(Game.name == game["game_name"]).first()
+	result.rating = "%u" % value
+	session.add(result)
+	session.commit()
+        self.model.dataChanged.emit(cursel, cursel)
 
     def launchGame(self):
         game = self._getSelected()
@@ -257,12 +272,18 @@ class FrontendApplication:
             QtGui.QMessageBox.critical(self.win, "Error", "An error occured while launching this game")
 
     def selectionChanged(self, *args):
+	global curgame
+
         game = self._getSelected()
+	curgame = game
         self.setGameImage(game)
 
     def setGameImage(self, game):
 	snapdir = "/home/martin/.attract/scraper/mame/snap"
 
+	rati = game["game_rating"]
+	if not rati: rati = 1
+	self.win.rating.setValue(int(rati))
         path = os.path.join(snapdir, game["game_name"] + ".png")
         if not os.path.exists(path):
 	    cmd = "curl -fLo %s mamedb.com/snap/%s.png" % (path, game["game_name"])
@@ -352,6 +373,7 @@ class MyModel(QtCore.QAbstractTableModel):
         3: ("Manufacturer", "manufacturer"),
         4: ("Status", "status"),
         5: ("Clone of", "cloneof"),
+        6: ("Rating", "rating"),
     }
     items_per_page = 50
     max_pages = 5
