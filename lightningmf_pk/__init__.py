@@ -188,7 +188,7 @@ class FrontendApplication:
         def parse_elements():
             session.begin()
             try:
-                session.query(Game).delete()
+                #session.query(Game).delete()
                 import xml.etree.ElementTree as etree
                 with open(filename) as tmpfile:
                     doc = etree.iterparse(tmpfile, events=("start", "end"))
@@ -222,7 +222,8 @@ class FrontendApplication:
 			    # look for peripherals
 			    if runn == "no":
 				getthis = False
-			    if getthis:
+			    result = session.execute(session.query(Game).filter(Game.name == name)).first()
+			    if getthis and result is None:
                                 session.add(game)
                             if num >= 200:
                                 session.commit()
