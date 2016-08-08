@@ -33,7 +33,7 @@ from sqlalchemy.orm import relationship
 import threading
 import json
 import shlex
-import StringIO
+import io
 import contextlib
 from sqlalchemy.pool import SingletonThreadPool
 
@@ -87,9 +87,9 @@ session = None
 # database initialisation
 
 def init_db():
-	if len(Base.metadata.tables.keys()) == 0:
+	if len(list(Base.metadata.tables.keys())) == 0:
 		return
-	tname = Base.metadata.tables.keys()[0]
+	tname = list(Base.metadata.tables.keys())[0]
 	if not engine.dialect.has_table(engine, tname):
 		Base.metadata.create_all(engine)
 
@@ -194,7 +194,7 @@ class FrontendApplication:
 				with open(filename) as tmpfile:
 					doc = etree.iterparse(tmpfile, events=("start", "end"))
 					doc = iter(doc)
-					event, root = doc.next()
+					event, root = next(doc)
 					num = 0
 					for event, elem in doc:
 						if event == "end" and elem.tag == "machine":
@@ -403,10 +403,10 @@ class MyModel(QtCore.QAbstractTableModel):
 		col = MyModel.headers[index.column()][1]
 		return game.get("game_" + col, "")
 	def _getRow(self, row):
-		page = row / MyModel.items_per_page
+		page = row // MyModel.items_per_page
 		if not page in self.cache:
 			if len(self.cache) >= MyModel.max_pages:
-				del self.cache[self.cache.keys()[0]]
+				del self.cache[list(self.cache.keys())[0]]
 			result = session.execute(self._buildQuery(session) \
 					.offset(page * MyModel.items_per_page).limit(MyModel.items_per_page))
 			dicts = [dict(x) for x in result]
@@ -420,13 +420,13 @@ class MyModel(QtCore.QAbstractTableModel):
 
 def main():
 	if len(sys.argv) >= 2 and sys.argv[1] == "-flush":
-		print "flush db"
+		print("flush db")
 		drop_db()
 	init_db()
 	global session
 	session = Session()
 	FrontendApplication().launch()
-	print "End of application"
+	print("End of application")
 	engine.dispose()
 
 if __name__ == '__main__':
