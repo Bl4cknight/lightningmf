@@ -16,7 +16,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from PySide import QtGui  
+from PySide import QtGui
 from PySide import QtCore
 from PySide import QtUiTools
 import sys
@@ -33,50 +33,46 @@ from sqlalchemy.orm import relationship
 import threading
 import json
 import shlex
-import io
+import StringIO
 import contextlib
 from sqlalchemy.pool import SingletonThreadPool
+import random
 
 SCRIPT_ROOT = os.path.dirname(os.path.realpath(__file__))
 
 data_directory = os.path.expanduser("~/.lightningmf")
 if not os.path.exists(data_directory):
-	os.makedirs(data_directory)
+    os.makedirs(data_directory)
 
 confFile = os.path.join(data_directory, "conf.json")
 
 cstring = "sqlite:///" + os.path.join(data_directory, "db.sqlite")
 engine = sqlalchemy.create_engine(cstring, poolclass=SingletonThreadPool)
 
-# scrape sreenshots from mamedb:
-scrape = True
-snapdir = "/home/martin/.attract/scraper/mame/snap"
-
 # Some helpers to help use SqlAlchemy
 class Base(object):
-	@sqlalchemy.ext.declarative.declared_attr
-	def __tablename__(cls):
-		return cls.__name__.lower()
+    @sqlalchemy.ext.declarative.declared_attr
+    def __tablename__(cls):
+        return cls.__name__.lower()
 
-	@sqlalchemy.ext.declarative.declared_attr
-	def id(cls):
-		return Column(Integer, Sequence(cls.__name__.lower() + "_id_seq"), primary_key=True)
+    @sqlalchemy.ext.declarative.declared_attr
+    def id(cls):
+        return Column(Integer, Sequence(cls.__name__.lower() + "_id_seq"), primary_key=True)
 
 Base = sqlalchemy.ext.declarative.declarative_base(cls=Base)
 
 def Many2One(class_name, **kwargs):
-	return Column(Integer, sqlalchemy.ForeignKey(class_name.lower() + ".id"), **kwargs)
+    return Column(Integer, sqlalchemy.ForeignKey(class_name.lower() + ".id"), **kwargs)
 
 # models
 
 class Game(Base):
-	name = Column(String(50), nullable=False, index=True)
-	description = Column(String(200), nullable=False, index=True)
-	year = Column(String(10), nullable=False)
-	manufacturer = Column(String(70), nullable=False)
-	status = Column(String(50), nullable=False)
-	cloneof = Column(String(50))
-	rating = Column(String(10))
+    name = Column(String(50), nullable=False, index=True)
+    description = Column(String(200), nullable=False, index=True)
+    year = Column(String(10), nullable=False)
+    manufacturer = Column(String(70), nullable=False)
+    status = Column(String(50), nullable=False)
+    cloneof = Column(String(50))
 
 # session
 
@@ -87,348 +83,315 @@ session = None
 # database initialisation
 
 def init_db():
-	if len(list(Base.metadata.tables.keys())) == 0:
-		return
-	tname = list(Base.metadata.tables.keys())[0]
-	if not engine.dialect.has_table(engine, tname):
-		Base.metadata.create_all(engine)
+    if len(Base.metadata.tables.keys()) == 0:
+        return
+    tname = Base.metadata.tables.keys()[0]
+    if not engine.dialect.has_table(engine, tname):
+        Base.metadata.create_all(engine)
 
 def drop_db():
-	Base.metadata.drop_all(engine)
+    Base.metadata.drop_all(engine)
 
 # gui
 class FrontendApplication:
-	def launch(self):
-		self.configuration = {
-			"mameExecutable": "",
-			"commandLineArguments": "",
-			"snapsFolder": "",
-			"romsFolder": "",
-		}
-		self.loadConfigFile()
+    def launch(self):
+        self.configuration = {
+            "mameExecutable": "",
+            "commandLineArguments": "",
+            "snapsFolder": "",
+            "romsFolder": "",
+        }
+        self.loadConfigFile()
 
-		self.app = QtGui.QApplication(sys.argv)  
+        self.app = QtGui.QApplication(sys.argv)
 
-		loader = QtUiTools.QUiLoader()
-		loader.setWorkingDirectory(QtCore.QDir(SCRIPT_ROOT))
-		file = QtCore.QFile(os.path.join(SCRIPT_ROOT, "view.ui"))
-		try:
-			file.open(QtCore.QFile.ReadOnly)
-			self.win = loader.load(file)
-		finally:
-			file.close()
+        loader = QtUiTools.QUiLoader()
+        loader.setWorkingDirectory(QtCore.QDir(SCRIPT_ROOT))
+        file = QtCore.QFile(os.path.join(SCRIPT_ROOT, "view.ui"))
+        try:
+            file.open(QtCore.QFile.ReadOnly)
+            self.win = loader.load(file)
+        finally:
+            file.close()
 
-		self.win.move(QtGui.QDesktopWidget().availableGeometry().center() - self.win.geometry().center());
-		self.settings = QtCore.QSettings("qsdoiuhvap", "xpoihybao");
-		self.win.restoreGeometry(self.settings.value("geometry"));
-		self.win.show()
-		
-		self.model = MyModel()
+        self.win.move(QtGui.QDesktopWidget().availableGeometry().center() - self.win.geometry().center());
+        self.settings = QtCore.QSettings("qsdoiuhvap", "xpoihybao");
+        self.win.restoreGeometry(self.settings.value("geometry"));
+        self.win.show()
 
-		#http://stackoverflow.com/questions/11606259/how-to-sort-a-qtableview-by-a-column
-		self.proxyModel = QtGui.QSortFilterProxyModel()
-		self.proxyModel.setSourceModel(self.model)
-
-		self.win.itemsView.setModel(self.proxyModel)
-		self.win.itemsView.setSortingEnabled(True)
-		self.win.itemsView.sortByColumn(0, QtCore.Qt.SortOrder(0))
-		self.win.itemsView.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
-		self.win.itemsView.doubleClicked.connect(self.launchGame)
-		self.win.rating.valueChanged.connect(self.setrating)
-		x = self.win.itemsView.selectionModel()
-		x.selectionChanged.connect(self.selectionChanged)
-		def set_number():
-			num = self.model.rowCount()
-			self.win.romsNumberLabel.setText("%d roms" % num)
-		self.model.modelReset.connect(set_number)
-		set_number()
+        self.model = MyModel()
+        self.win.itemsView.setModel(self.model)
+        self.win.itemsView.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
+        self.win.itemsView.doubleClicked.connect(self.launchGame)
+        x = self.win.itemsView.selectionModel()
+        x.selectionChanged.connect(self.selectionChanged)
+        def set_number():
+            num = self.model.rowCount()
+            self.win.romsNumberLabel.setText("%d roms" % num)
+        self.model.modelReset.connect(set_number)
+        set_number()
 
 
-		self.win.actionRoms.triggered.connect(self.loadRoms)
-		self.win.actionMame.triggered.connect(self.configure)
+        self.win.actionRoms.triggered.connect(self.loadRoms)
+        self.win.actionMame.triggered.connect(self.configure)
 
-		self.win.searchInput.textEdited.connect(self.searchChanged)
+        self.win.searchInput.textEdited.connect(self.searchChanged)
 
-		self.win.launchButton.clicked.connect(self.launchGame)
+        self.win.launchButton.clicked.connect(self.launchGame)
 
-		def starting():
-			if self.configuration["mameExecutable"] == "":
-				ret = QtGui.QMessageBox.question(self.win, "Configuration Missing", "Lightning MAME Frontend is not configured, do you " \
-						+ "want to configure it now?",
-						buttons=QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, defaultButton=QtGui.QMessageBox.Yes)
-				if ret == QtGui.QMessageBox.Yes:
-					try:
-						subprocess.check_call(['mame', "-help"])
-						self.configuration["mameExecutable"] = "mame"
-						self.configuration["romsFolder"] = os.path.expanduser("~/.mame/roms")
-						self.configuration["snapsFolder"] = os.path.expanduser("~/.mame/snaps")
-					except:
-						pass # do nothing
-					self.configure()
+        def starting():
+            if self.configuration["mameExecutable"] == "":
+                ret = QtGui.QMessageBox.question(self.win, "Configuration Missing", "Lightning MAME Frontend is not configured, do you " \
+                        + "want to configure it now?",
+                        buttons=QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, defaultButton=QtGui.QMessageBox.Yes)
+                if ret == QtGui.QMessageBox.Yes:
+                    try:
+                        subprocess.check_call(['mame', "-help"])
+                        self.configuration["mameExecutable"] = "mame"
+                        self.configuration["romsFolder"] = os.path.expanduser("~/.mame/roms")
+                        self.configuration["snapsFolder"] = os.path.expanduser("~/.mame/snaps")
+                    except:
+                        pass # do nothing
+                    self.configure()
 
-		QtCore.QTimer.singleShot(0, starting)
+        QtCore.QTimer.singleShot(0, starting)
 
-		self.app.exec_()
-		
-		self.settings.setValue("geometry", self.win.saveGeometry())
-	
-	def loadRoms(self):
-		self.win.statusBar().showMessage("Updating roms, please wait...", 2000)
-		QtCore.QTimer.singleShot(0, self.trueLoadRoms)
+        self.app.exec_()
 
-	def trueLoadRoms(self):
-		filename = tempfile.mktemp()
-		try:
-			with open(filename, "w") as tmpfile:
-				subprocess.check_call([self.configuration["mameExecutable"], "-listxml"], stdout=tmpfile)
-		except Exception as e:
-			QtGui.QMessageBox.critical(self.win, "Error", "An error occured while listing the roms")
-			self.win.statusBar().showMessage("Rom update failed", 2000)
-			return
+        self.settings.setValue("geometry", self.win.saveGeometry())
 
-		def parse_elements():
-			session.begin()
-			try:
-				#session.query(Game).delete()
-				import xml.etree.ElementTree as etree
-				with open(filename) as tmpfile:
-					doc = etree.iterparse(tmpfile, events=("start", "end"))
-					doc = iter(doc)
-					event, root = next(doc)
-					num = 0
-					for event, elem in doc:
-						if event == "end" and elem.tag == "machine":
-							name = elem.get("name")
-							runn = elem.get("runnable")
-							if not os.path.exists(os.path.join(self.configuration["romsFolder"], name + ".zip")):
-								root.clear()
-								continue
-							desc = elem.findtext("description") or ""
-							year = elem.findtext("year") or ""
-							manu = elem.findtext("manufacturer") or ""
-							clone = elem.get("cloneof") or None
-							status = ""
-							driver = elem.find("driver")
-							if driver is not None:
-								status = driver.get("status") or ""
-							game = Game(name=name, description=desc, year=year, manufacturer=manu, status=status,
-									cloneof=clone, rating = "1")
-							devs = elem.findall("device")
-							getthis = True
-							# filter our computers, gaming consoles, etc.
-							if devs:
-								for dd in devs:
-									if dd.attrib["type"] in ("floppydisk", "cassette", "cartridge"):
-										getthis = False
-							# look for peripherals
-							if runn == "no":
-								getthis = False
-							result = session.execute(session.query(Game).filter(Game.name == name)).first()
-							if getthis and result is None:
-								session.add(game)
-							if num >= 200:
-								session.commit()
-								num = 0
-							root.clear()
-				session.commit()
-			except:
-				session.rollback()
-				raise
+    def parse_elements(self, filename):
+        session.begin()
+        try:
+            import xml.etree.ElementTree as etree
+            with open(filename) as tmpfile:
+                doc = etree.iterparse(tmpfile, events=("start", "end"))
+                doc = iter(doc)
+                event, root = doc.next()
+                num = 0
+                for event, elem in doc:
+                    if event == "end" and elem.tag == "game":
+                        name = elem.get("name")
+                        if not os.path.exists(os.path.join(self.configuration["romsFolder"], name + ".zip")):
+                            root.clear()
+                            continue
+                        desc = elem.findtext("description") or ""
+                        year = elem.findtext("year") or ""
+                        manu = elem.findtext("manufacturer") or ""
+                        clone = elem.get("cloneof") or None
+                        status = ""
+                        driver = elem.find("driver")
+                        if driver is not None:
+                            status = driver.get("status") or ""
+                        game = Game(name=name, description=desc, year=year, manufacturer=manu, status=status,
+                                cloneof=clone)
+                        session.add(game)
+                        if num >= 200:
+                            session.commit()
+                            num = 0
+                        root.clear()
+            session.commit()
+        except:
+            session.rollback()
+            raise
 
-		parse_elements()
 
-		self.model.modelReset.emit()
-		self.win.statusBar().showMessage("Rom update succeeded", 2000)
+    def loadRoms(self):
+        msgbox = QtGui.QMessageBox(self.win)
+        msgbox.setWindowTitle("Loading...")
+        msgbox.setText("Roms Loaded!")
+        msgbox.show()
+        session.query(Game).delete()
+        QtCore.QTimer.singleShot(0, self.trueLoadRoms)
 
-	def searchChanged(self, text):
-		self.model.searchString = text
-		self.model.modelReset.emit()
+    def trueLoadRoms(self):
+        filename = tempfile.mktemp()
+        rompath= os.path.join(self.configuration["romsFolder"])
+        for root, dirs, files in os.walk(rompath):
+            for rom in files:
+                rom = os.path.splitext(rom)[0]
+                with open(filename, "w") as tmpfile:
+                    try:
+                        subprocess.check_call([self.configuration["mameExecutable"], "-listxml", rom], stdout=tmpfile, stderr=subprocess.PIPE)
+                        self.parse_elements(filename)
+                        self.model.modelReset.emit()
+                    except Exception:
+                        continue
+        self.win.statusBar().showMessage("Rom update succeeded", 2000)
 
-	def _getSelected(self):
-		global cursel
+    def searchChanged(self, text):
+        self.model.searchString = text
+        self.model.modelReset.emit()
 
-		selected = self.win.itemsView.selectedIndexes()
-		if len(selected) == 0:
-			return
-		selected = selected[0]
-		cursel = selected
-		index = self.proxyModel.mapSelectionToSource(QtGui.QItemSelection(selected, selected)).indexes()[0]
-		return self.model._getRow(index.row())
+    def _getSelected(self):
+        selected = self.win.itemsView.selectedIndexes()
+        if len(selected) == 0:
+            return
+        selected = selected[0].row()
+        return self.model._getRow(selected)
 
-	def setrating(self, value):
-		game = curgame
-		game["game_rating"] = "%u" % value
-		session.begin()
-		result = session.query(Game).filter(Game.name == game["game_name"]).first()
-		result.rating = "%u" % value
-		session.add(result)
-		session.commit()
-		self.model.dataChanged.emit(cursel, cursel)
+    def launchGame(self):
+        game = self._getSelected()
+        try:
+            subprocess.check_call([self.configuration["mameExecutable"], game["game_name"]] \
+                + shlex.split(self.configuration["commandLineArguments"]))
+        except Exception as e:
+            QtGui.QMessageBox.critical(self.win, "Error", "An error occured while launching this game")
 
-	def launchGame(self):
-		game = self._getSelected()
-		try:
-			subprocess.check_call([self.configuration["mameExecutable"], game["game_name"]] \
-				+ shlex.split(self.configuration["commandLineArguments"]))
-		except Exception as e:
-			QtGui.QMessageBox.critical(self.win, "Error", "An error occured while launching this game")
+    def selectionChanged(self, *args):
+        game = self._getSelected()
+        self.setGameImage(game)
 
-	def selectionChanged(self, *args):
-		global curgame
+    def setGameImage(self, game):
+        path = os.path.join(self.configuration["snapsFolder"], game["game_name"])
+        if not os.path.exists(path):
+            pix = None
+            clone = game["game_cloneof"]
+            if clone is not None:
+                result = session.execute(session.query(Game).filter(Game.name == clone))
+                result = [dict(x) for x in result]
+                parent = result[0] if len(result) >= 1 else None
+                if parent is not None:
+                    return self.setGameImage(parent)
+        else:
+            try:
+                images_list = []
+                for root, dirs, files in os.walk(path):
+                    for fil in files:
+                        if fil.endswith(".png"):
+                            images_list.append(fil)
 
-		game = self._getSelected()
-		curgame = game
-		self.setGameImage(game)
+                image = random.choice(images_list)
+                img = QtGui.QImage()
+                img.load(path + "/" + image)
+                size = QtCore.QSize(self.win.imageLabel.width(), self.win.imageLabel.height())
+                img = img.scaled(size, QtCore.Qt.KeepAspectRatio)
+                pix = QtGui.QPixmap.fromImage(img)
+                self.win.imageLabel.setPixmap(pix)
+            except Exception:
+                pass
 
-	def setGameImage(self, game):
-		rati = game["game_rating"]
-		if not rati: rati = 1
-		self.win.rating.setValue(int(rati))
-		path = os.path.join(snapdir, game["game_name"] + ".png")
-		if not os.path.exists(path):
-			cmd = "curl -fLo %s mamedb.com/snap/%s.png" % (path, game["game_name"])
-			if scrape:
-				os.system(cmd)
-			path = os.path.join(self.configuration["snapsFolder"], game["game_name"], "0000.png")
-		if not os.path.exists(path):
-			pix = None
-			clone = game["game_cloneof"]
-			if clone is not None:
-				result = session.execute(session.query(Game).filter(Game.name == clone))
-				result = [dict(x) for x in result]
-				parent = result[0] if len(result) >= 1 else None
-				if parent is not None:
-					return self.setGameImage(parent)
-		else:
-			img = QtGui.QImage()
-			img.load(path)
-			size = QtCore.QSize(self.win.imageLabel.width(), self.win.imageLabel.height())
-			img = img.scaled(size, QtCore.Qt.KeepAspectRatio)
-			pix = QtGui.QPixmap.fromImage(img)
-		self.win.imageLabel.setPixmap(pix)
+    def configure(self):
+        loader = QtUiTools.QUiLoader()
+        file = QtCore.QFile(os.path.join(SCRIPT_ROOT, "config.ui"))
+        try:
+            file.open(QtCore.QFile.ReadOnly)
+            self.confDial = loader.load(file)
+        finally:
+            file.close()
 
-	def configure(self):
-		loader = QtUiTools.QUiLoader()
-		file = QtCore.QFile(os.path.join(SCRIPT_ROOT, "config.ui"))
-		try:
-			file.open(QtCore.QFile.ReadOnly)
-			self.confDial = loader.load(file)
-		finally:
-			file.close()
+        self.confDial.mameExecInput.setText(self.configuration["mameExecutable"])
+        self.confDial.cmdInput.setText(self.configuration["commandLineArguments"])
+        self.confDial.snapsInput.setText(self.configuration["snapsFolder"])
+        self.confDial.romsInput.setText(self.configuration["romsFolder"])
 
-		self.confDial.mameExecInput.setText(self.configuration["mameExecutable"])
-		self.confDial.cmdInput.setText(self.configuration["commandLineArguments"])
-		self.confDial.snapsInput.setText(self.configuration["snapsFolder"])
-		self.confDial.romsInput.setText(self.configuration["romsFolder"])
+        def browse():
+            name = QtGui.QFileDialog.getOpenFileName(self.confDial, "Choose MAME Executable")
+            if len(name[0]) > 0:
+                self.confDial.mameExecInput.setText(name[0])
+        self.confDial.browseButton.clicked.connect(browse)
+        def snapsBrowse():
+            name = QtGui.QFileDialog.getExistingDirectory(self.confDial, "Choose Snapshots Folder")
+            if len(name) > 0:
+                self.confDial.snapsInput.setText(name)
+        self.confDial.snapsButton.clicked.connect(snapsBrowse)
+        def romsBrowse():
+            name = QtGui.QFileDialog.getExistingDirectory(self.confDial, "Choose Roms Folder")
+            if len(name) > 0:
+                self.confDial.romsInput.setText(name)
+        self.confDial.romsButton.clicked.connect(romsBrowse)
 
-		def browse():
-			name = QtGui.QFileDialog.getOpenFileName(self.confDial, "Choose MAME Executable")
-			if len(name[0]) > 0:
-				self.confDial.mameExecInput.setText(name[0])
-		self.confDial.browseButton.clicked.connect(browse)
-		def snapsBrowse():
-			name = QtGui.QFileDialog.getExistingDirectory(self.confDial, "Choose Snapshots Folder")
-			if len(name) > 0:
-				self.confDial.snapsInput.setText(name)
-		self.confDial.snapsButton.clicked.connect(snapsBrowse)
-		def romsBrowse():
-			name = QtGui.QFileDialog.getExistingDirectory(self.confDial, "Choose Roms Folder")
-			if len(name) > 0:
-				self.confDial.romsInput.setText(name)
-		self.confDial.romsButton.clicked.connect(romsBrowse)
+        def save():
+            params = {
+                "mameExecutable": self.confDial.mameExecInput.text(),
+                "commandLineArguments": self.confDial.cmdInput.text(),
+                "snapsFolder": self.confDial.snapsInput.text(),
+                "romsFolder": self.confDial.romsInput.text(),
+            }
+            dump = json.dumps(params)
+            with open(confFile, "w") as file:
+                file.write(dump)
+            self.loadConfigFile()
+            if self.model.rowCount() == 0:
+                ret = QtGui.QMessageBox.question(self.confDial, "Roms Loading", "Do you want to load the roms now?",
+                    buttons=QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, defaultButton=QtGui.QMessageBox.Yes)
+                if ret == QtGui.QMessageBox.Yes:
+                    QtCore.QTimer.singleShot(0, self.loadRoms)
 
-		def save():
-			params = {
-				"mameExecutable": self.confDial.mameExecInput.text(),
-				"commandLineArguments": self.confDial.cmdInput.text(),
-				"snapsFolder": self.confDial.snapsInput.text(),
-				"romsFolder": self.confDial.romsInput.text(),
-			}
-			dump = json.dumps(params)
-			with open(confFile, "w") as file:
-				file.write(dump)
-			self.loadConfigFile()
-			if self.model.rowCount() == 0:
-				ret = QtGui.QMessageBox.question(self.confDial, "Roms Loading", "Do you want to load the roms now?",
-					buttons=QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, defaultButton=QtGui.QMessageBox.Yes)
-				if ret == QtGui.QMessageBox.Yes:
-					QtCore.QTimer.singleShot(0, self.loadRoms)
+        self.confDial.buttonBox.accepted.connect(save)
 
-		self.confDial.buttonBox.accepted.connect(save)
+        self.confDial.show()
 
-		self.confDial.show()
-
-	def loadConfigFile(self):
-		if not os.path.exists(confFile):
-			return
-		with open(confFile) as file:
-			tmp = file.read()
-		self.configuration = json.loads(tmp)
+    def loadConfigFile(self):
+        if not os.path.exists(confFile):
+            return
+        with open(confFile) as file:
+            tmp = file.read()
+        self.configuration = json.loads(tmp)
 
 class MyModel(QtCore.QAbstractTableModel):
-	headers = {
-		0: ("Title", "description"),
-		1: ("Name", "name"),
-		2: ("Year", "year"),
-		3: ("Manufacturer", "manufacturer"),
-		4: ("Status", "status"),
-		5: ("Clone of", "cloneof"),
-		6: ("Rating", "rating"),
-	}
-	items_per_page = 50
-	max_pages = 5
-	def __init__(self):
-		super(MyModel, self).__init__()
-		self.cache = {}
-		self.count = None
-		self.searchString = ""
-		def reset():
-			self.cache = {}
-			self.count = None
-		self.modelReset.connect(reset)
-	def rowCount(self, *args):
-		if self.count is None:
-			self.count = self._buildQuery(session).count()
-		return self.count
-	def _buildQuery(self, session):
-		return session.query(Game).order_by(Game.description).filter( \
-				sqlalchemy.or_(Game.description.like("%" + self.searchString + "%"), \
-				Game.name.like("%" + self.searchString + "%")))
-	def columnCount(self, *args):
-		return len(MyModel.headers)
-	def data(self, index, role):
-		if role != QtCore.Qt.DisplayRole:
-			return
-		game = self._getRow(index.row())
-		col = MyModel.headers[index.column()][1]
-		return game.get("game_" + col, "")
-	def _getRow(self, row):
-		page = row // MyModel.items_per_page
-		if not page in self.cache:
-			if len(self.cache) >= MyModel.max_pages:
-				del self.cache[list(self.cache.keys())[0]]
-			result = session.execute(self._buildQuery(session) \
-					.offset(page * MyModel.items_per_page).limit(MyModel.items_per_page))
-			dicts = [dict(x) for x in result]
-			self.cache[page] = dicts
-		return self.cache[page][row % MyModel.items_per_page]
-	def headerData(self, section, orientation, role):
-		if role != QtCore.Qt.DisplayRole:
-			return
-		if orientation == QtCore.Qt.Horizontal:
-			return MyModel.headers[section][0]
+    headers = {
+        0: ("Title", "description"),
+        1: ("Name", "name"),
+        2: ("Year", "year"),
+        3: ("Manufacturer", "manufacturer"),
+        4: ("Status", "status"),
+        5: ("Clone of", "cloneof"),
+    }
+    items_per_page = 50
+    max_pages = 5
+    def __init__(self):
+        super(MyModel, self).__init__()
+        self.cache = {}
+        self.count = None
+        self.searchString = ""
+        def reset():
+            self.cache = {}
+            self.count = None
+        self.modelReset.connect(reset)
+    def rowCount(self, *args):
+        if self.count is None:
+            self.count = self._buildQuery(session).count()
+        return self.count
+    def _buildQuery(self, session):
+        return session.query(Game).order_by(Game.description).filter( \
+                sqlalchemy.or_(Game.description.like("%" + self.searchString + "%"), \
+                Game.name.like("%" + self.searchString + "%")))
+    def columnCount(self, *args):
+        return len(MyModel.headers)
+    def data(self, index, role):
+        if role != QtCore.Qt.DisplayRole:
+            return
+        game = self._getRow(index.row())
+        col = MyModel.headers[index.column()][1]
+        return game.get("game_" + col, "")
+    def _getRow(self, row):
+        page = row / MyModel.items_per_page
+        if not page in self.cache:
+            if len(self.cache) >= MyModel.max_pages:
+                del self.cache[self.cache.keys()[0]]
+            result = session.execute(self._buildQuery(session) \
+                    .offset(page * MyModel.items_per_page).limit(MyModel.items_per_page))
+            dicts = [dict(x) for x in result]
+            self.cache[page] = dicts
+        return self.cache[page][row % MyModel.items_per_page]
+    def headerData(self, section, orientation, role):
+        if role != QtCore.Qt.DisplayRole:
+            return
+        if orientation == QtCore.Qt.Horizontal:
+            return MyModel.headers[section][0]
 
 def main():
-	if len(sys.argv) >= 2 and sys.argv[1] == "-flush":
-		print("flush db")
-		drop_db()
-	init_db()
-	global session
-	session = Session()
-	FrontendApplication().launch()
-	print("End of application")
-	engine.dispose()
+    if len(sys.argv) >= 2 and sys.argv[1] == "-flush":
+        print "flush db"
+        drop_db()
+    init_db()
+    global session
+    session = Session()
+    FrontendApplication().launch()
+    print "End of application"
+    engine.dispose()
 
 if __name__ == '__main__':
-	main()
+    main()
 
