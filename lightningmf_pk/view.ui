@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>821</width>
-    <height>449</height>
+    <height>437</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -94,22 +94,6 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="0">
-          <widget class="QScrollBar" name="rating">
-           <property name="minimum">
-            <number>1</number>
-           </property>
-           <property name="maximum">
-            <number>5</number>
-           </property>
-           <property name="pageStep">
-            <number>1</number>
-           </property>
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-          </widget>
-         </item>
         </layout>
        </widget>
       </item>
@@ -154,7 +138,7 @@
      <x>0</x>
      <y>0</y>
      <width>821</width>
-     <height>32</height>
+     <height>25</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -180,7 +164,7 @@
      <bool>true</bool>
     </property>
     <property name="title">
-     <string>&amp;Configuration</string>
+     <string>Configuration</string>
     </property>
     <addaction name="actionMame"/>
     <addaction name="actionRoms"/>
@@ -190,12 +174,12 @@
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionMame">
    <property name="text">
-    <string>&amp;MAME Configuration</string>
+    <string>MAME Configuration</string>
    </property>
   </action>
   <action name="actionRoms">
    <property name="text">
-    <string>&amp;Load rom data</string>
+    <string>Load rom data</string>
    </property>
   </action>
  </widget>
