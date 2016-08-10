@@ -17,6 +17,10 @@ From the command line, type:
     lightningmf
 
 ###Changelog:
+- 1.0.4:
+  - Resolved bottleneck on roms data loading
+  - A box dialog is shown during roms loading
+  - When a rom entry is selected the application shows a random snapshot taken from rom snapshots folder if exists.
 - 1.0.3:
   - corrected crash under ubuntu
   - changed the installation method to pip
