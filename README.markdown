@@ -5,18 +5,16 @@ This program is a MAME frontend designed for Linux. It was created to be easy to
 
 [See the website for info about it.](http://lightningmf.neoname.eu)
 
-###To install (on Ubuntu or Debian):
-
-    sudo apt-get install python-pyside python-pip
-    sudo pip install lightningmf
-
 ###To launch:
 
-From the command line, type:
+From the program folder, type:
 
-    lightningmf
+    python lightningmf
 
 ###Changelog:
+- 1.0.5:
+  - Improved rom loading updating only new added/removed roms
+  - Fixed Segmentaton Fault on close
 - 1.0.4:
   - Resolved bottleneck on roms data loading
   - A box dialog is shown during roms loading

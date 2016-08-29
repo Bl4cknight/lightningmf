@@ -20,21 +20,16 @@ from PySide import QtGui
 from PySide import QtCore
 from PySide import QtUiTools
 import sys
-import os
 import tempfile
 import subprocess
 import sqlalchemy
-import os.path
 import os
 import sqlalchemy.orm
 import sqlalchemy.ext.declarative
 from sqlalchemy import Column, Integer, String, Sequence, Boolean
 from sqlalchemy.orm import relationship
-import threading
 import json
 import shlex
-import StringIO
-import contextlib
 from sqlalchemy.pool import SingletonThreadPool
 import random
 
@@ -133,6 +128,7 @@ class FrontendApplication:
 
 
         self.win.actionRoms.triggered.connect(self.loadRoms)
+        self.trueLoadRoms()
         self.win.actionMame.triggered.connect(self.configure)
 
         self.win.searchInput.textEdited.connect(self.searchChanged)
@@ -159,6 +155,10 @@ class FrontendApplication:
         self.app.exec_()
 
         self.settings.setValue("geometry", self.win.saveGeometry())
+
+    def close(self):
+        self.app.quit()
+        # sys.exit(self.app.exec_())
 
     def parse_elements(self, filename):
         session.begin()
@@ -201,20 +201,47 @@ class FrontendApplication:
         msgbox.setWindowTitle("Loading...")
         msgbox.setText("Roms Loaded!")
         msgbox.show()
-        session.query(Game).delete()
+        #session.query(Game).delete()
         QtCore.QTimer.singleShot(0, self.trueLoadRoms)
 
     def trueLoadRoms(self):
         filename = tempfile.mktemp()
         rompath= os.path.join(self.configuration["romsFolder"])
+
+        # remove from db roms deleted from romsFolder
+        added_roms = []
+        dblist = []
+        result = session.execute(session.query(Game.name))
+        for line in result:
+            dblist.append(line[0])
+
+        for root, dirs, files in os.walk(rompath):
+            for rom in files:
+                rom = os.path.splitext(rom)[0]
+                added_roms.append(rom)
+        toremovelist = dblist[:]
+        for rom in added_roms:
+            if rom in dblist:
+                toremovelist.remove(rom)
+        for rom in toremovelist:
+            session.query(Game).filter(Game.name == rom).delete(synchronize_session=False)
+        self.model.modelReset.emit()
+
+        # rom on db
+        finaldblist = []
+        result = session.execute(session.query(Game.name))
+        for line in result:
+            finaldblist.append(line[0])
+
         for root, dirs, files in os.walk(rompath):
             for rom in files:
                 rom = os.path.splitext(rom)[0]
                 with open(filename, "w") as tmpfile:
                     try:
-                        subprocess.check_call([self.configuration["mameExecutable"], "-listxml", rom], stdout=tmpfile, stderr=subprocess.PIPE)
-                        self.parse_elements(filename)
-                        self.model.modelReset.emit()
+                        if rom not in finaldblist:
+                            subprocess.check_call([self.configuration["mameExecutable"], "-listxml", rom], stdout=tmpfile, stderr=subprocess.PIPE)
+                            self.parse_elements(filename)
+                            self.model.modelReset.emit()
                     except Exception:
                         continue
         self.win.statusBar().showMessage("Rom update succeeded", 2000)
@@ -388,9 +415,10 @@ def main():
     init_db()
     global session
     session = Session()
-    FrontendApplication().launch()
-    print "End of application"
+    app = FrontendApplication()
+    app.launch()
     engine.dispose()
+    app.close()
 
 if __name__ == '__main__':
     main()
