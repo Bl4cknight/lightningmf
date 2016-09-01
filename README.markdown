@@ -12,9 +12,12 @@ From the program folder, type:
     python lightningmf
 
 ###Changelog:
-- 1.0.5:
-  - Improved rom loading updating only new added/removed roms
+- 1.0.6
   - Fixed Segmentaton Fault on close
+  - ProgressBar on roms loading/updating
+  - Code Refactoring
+- 1.0.5:
+  - Improved rom loading/updating (processing only new added/removed roms)
 - 1.0.4:
   - Resolved bottleneck on roms data loading
   - A box dialog is shown during roms loading

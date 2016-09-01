@@ -122,9 +122,16 @@
        </spacer>
       </item>
       <item>
-       <widget class="QPushButton" name="launchButton">
+       <widget class="QPushButton" name="loadButton">
         <property name="text">
-         <string>Launch</string>
+         <string>Load Roms</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="settingsButton">
+        <property name="text">
+         <string>Settings</string>
         </property>
        </widget>
       </item>
