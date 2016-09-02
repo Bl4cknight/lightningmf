@@ -12,6 +12,8 @@ From the program folder, type:
     python lightningmf
 
 ###Changelog:
+- 1.0.7
+  - Download snapshots from mamedb
 - 1.0.6
   - Fixed Segmentaton Fault on close
   - ProgressBar on roms loading/updating

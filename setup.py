@@ -2,7 +2,13 @@
 # -*- coding: utf-8 -*-
 from setuptools import setup
 import os.path
+from distutils.core import setup
+import py2exe
 
+setup(windows=[{"script" : "app.pyw"}], options={"py2exe" : {"includes" : ["sip", "PyQt4._qt"]}})
+
+
+'''
 setup(name='lightningmf',
 	version='1.0.5',
 	description='Lightning MAME Frontend',
@@ -19,4 +25,4 @@ setup(name='lightningmf',
 		"SqlAlchemy>=1.0.0",
 	],
 )
-
+'''

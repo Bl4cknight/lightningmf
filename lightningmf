@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/env python
 #    Lightning MAME Frontend
 #    Copyright (C) 2012 Nicolas Vanhoren
 #
@@ -25,6 +25,9 @@ from lightningmf_pk.DownloadingWindow import DownloadingWindow
 import json
 import shlex
 import random
+import requests
+import shutil
+import errno
 
 SCRIPT_ROOT = os.path.dirname(os.path.realpath(__file__)) + "/lightningmf_pk/"
 
@@ -78,6 +81,7 @@ class FrontendApplication:
 
         self.win.loadButton.clicked.connect(self.loadRoms)
         self.win.settingsButton.clicked.connect(self.configure)
+        self.win.snapsButton.clicked.connect(self.downloadSnaps)
 
         def starting():
             if self.configuration["mameExecutable"] == "":
@@ -91,7 +95,7 @@ class FrontendApplication:
                         subprocess.check_call(['mame', "-help"])
                         self.configuration["mameExecutable"] = "mame"
                         self.configuration["romsFolder"] = os.path.expanduser("~/.mame/roms")
-                        self.configuration["snapsFolder"] = os.path.expanduser("~/.mame/snaps")
+                        self.configuration["snapsFolder"] = os.path.expanduser("~/.mame/snap")
                     except:
                         pass
                     self.configure()
@@ -186,28 +190,29 @@ class FrontendApplication:
         result = session.execute(session.query(Game.name))
         for line in result:
             finaldblist.append(line[0])
-        romCount = len([name for name in os.listdir(rompath) if os.path.isfile(os.path.join(rompath, name))])
+        if os.path.exists(rompath):
+            romCount = len([name for name in os.listdir(rompath) if os.path.isfile(os.path.join(rompath, name))])
 
-        count = 1
-        # print "Rom count: {} dblist: {}".format(romCount, len(finaldblist))
-        romCount -= len(finaldblist)
-        # print "diff: {}".format(romCount)
-        for root, dirs, files in os.walk(rompath):
-            for rom in files:
-                rom = os.path.splitext(rom)[0]
-                with open(filename, "w") as tmpfile:
-                    try:
-                        if rom not in finaldblist:
-                            if kwargs:
-                                kwargs['downWin'].setProgress(float((100 / romCount) * count))
-                                count += 1
-                            subprocess.check_call([self.configuration["mameExecutable"], "-listxml", rom],
-                                                  stdout=tmpfile, stderr=subprocess.PIPE)
-                            self.parse_elements(filename)
-                            self.model.modelReset.emit()
-                    except Exception:
-                        continue
-        self.win.statusBar().showMessage("Rom update succeeded", 2000)
+            count = 1
+            # print "Rom count: {} dblist: {}".format(romCount, len(finaldblist))
+            romCount -= len(finaldblist)
+            # print "diff: {}".format(romCount)
+            for root, dirs, files in os.walk(rompath):
+                for rom in files:
+                    rom = os.path.splitext(rom)[0]
+                    with open(filename, "w") as tmpfile:
+                        try:
+                            if rom not in finaldblist:
+                                if kwargs:
+                                    kwargs['downWin'].setProgress(float((100 / romCount) * count))
+                                    count += 1
+                                subprocess.check_call([self.configuration["mameExecutable"], "-listxml", rom],
+                                                      stdout=tmpfile, stderr=subprocess.PIPE)
+                                self.parse_elements(filename)
+                                self.model.modelReset.emit()
+                        except Exception:
+                            continue
+            self.win.statusBar().showMessage("Rom update succeeded", 2000)
 
     def searchChanged(self, text):
         self.model.searchString = text
@@ -231,6 +236,43 @@ class FrontendApplication:
     def selectionChanged(self, *args):
         game = self._getSelected()
         self.setGameImage(game)
+
+    def downloadSnaps(self):
+        snapspath = os.path.join(self.configuration["snapsFolder"])
+        dblist = []
+        result = session.execute(session.query(Game.name))
+        for line in result:
+            dblist.append(line[0])
+        for line in dblist:
+            filename = snapspath + "/"+line+"/"+line+".png"
+
+        downWindows = DownloadingWindow('Downloading snapshots from mamedb.com')
+        count = 0
+        if dblist:
+            downWindows.show()
+            percent = float(100 / len(dblist))
+            if os.path.exists(snapspath):
+                for line in dblist:
+                    try:
+                        downWindows.setProgress(float(percent * count))
+                        count += 1
+                        filename = snapspath + "/"+line+"/"+line+".png"
+                        if not os.path.exists(os.path.dirname(filename)):
+                            try:
+                                os.makedirs(os.path.dirname(filename))
+                            except OSError as exc:
+                                print "OS error"
+                                # Guard against race condition
+                                if exc.errno != errno.EEXIST:
+                                    raise
+                            url = "http://www.mamedb.com/snap/" + line + ".png"
+                            r = requests.get(url, stream=True)
+                            if r.status_code == 200:
+                                with open(filename, 'wb') as f:
+                                    r.raw.decode_content = True
+                                    shutil.copyfileobj(r.raw, f)
+                    except:
+                        continue
 
     def setGameImage(self, game):
         path = os.path.join(self.configuration["snapsFolder"], game["game_name"])
