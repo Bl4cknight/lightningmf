@@ -9,9 +9,11 @@ This program is a MAME frontend designed for Linux. It was created to be easy to
 
 From the program folder, type:
 
-    python lightningmf
+    ./lightningmf
 
 ###Changelog:
+- 1.0.8
+  - Key press events added to manage rom launch (enter) and application quit (escape)
 - 1.0.7
   - Download snapshots from mamedb
 - 1.0.6

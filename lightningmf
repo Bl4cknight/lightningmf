@@ -20,6 +20,7 @@ from PySide import QtUiTools
 import sys
 import tempfile
 import subprocess
+from lightningmf_pk.KeyFilter import KeyFilter
 from lightningmf_pk.MyModel import *
 from lightningmf_pk.DownloadingWindow import DownloadingWindow
 import json
@@ -45,6 +46,9 @@ class FrontendApplication:
 
         self.app = QtGui.QApplication(sys.argv)
 
+        key_filter = KeyFilter()
+        self.app.installEventFilter(key_filter)
+
         loader = QtUiTools.QUiLoader()
         loader.setWorkingDirectory(QtCore.QDir(SCRIPT_ROOT))
         file = QtCore.QFile(os.path.join(SCRIPT_ROOT, "view.ui"))
@@ -54,15 +58,17 @@ class FrontendApplication:
         finally:
             file.close()
 
-        self.win.move(QtGui.QDesktopWidget().availableGeometry().center() - self.win.geometry().center());
-        self.settings = QtCore.QSettings("qsdoiuhvap", "xpoihybao");
-        self.win.restoreGeometry(self.settings.value("geometry"));
+        self.win.move(QtGui.QDesktopWidget().availableGeometry().center() - self.win.geometry().center())
+        self.settings = QtCore.QSettings("qsdoiuhvap", "xpoihybao")
+        self.win.restoreGeometry(self.settings.value("geometry"))
         self.win.show()
 
         self.model = MyModel()
         self.win.itemsView.setModel(self.model)
         self.win.itemsView.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
         self.win.itemsView.doubleClicked.connect(self.launchGame)
+        key_filter.returnPressed.connect(self.launchGame)
+        key_filter.escapePressed.connect(self.app.quit)
         x = self.win.itemsView.selectionModel()
         x.selectionChanged.connect(self.selectionChanged)
 
@@ -227,11 +233,12 @@ class FrontendApplication:
 
     def launchGame(self):
         game = self._getSelected()
-        try:
-            subprocess.check_call([self.configuration["mameExecutable"], game["game_name"]] \
-                                  + shlex.split(self.configuration["commandLineArguments"]))
-        except Exception as e:
-            QtGui.QMessageBox.critical(self.win, "Error", "An error occured while launching this game")
+        if game:
+            try:
+                subprocess.check_call([self.configuration["mameExecutable"], "-rompath", self.configuration["romsFolder"],  game["game_name"]] \
+                                      + shlex.split(self.configuration["commandLineArguments"]))
+            except Exception as e:
+                QtGui.QMessageBox.critical(self.win, "Error", "An error occured while launching this game")
 
     def selectionChanged(self, *args):
         game = self._getSelected()
@@ -243,15 +250,15 @@ class FrontendApplication:
         result = session.execute(session.query(Game.name))
         for line in result:
             dblist.append(line[0])
-        for line in dblist:
-            filename = snapspath + "/"+line+"/"+line+".png"
 
         downWindows = DownloadingWindow('Downloading snapshots from mamedb.com')
         count = 0
         if dblist:
             downWindows.show()
             percent = float(100 / len(dblist))
-            if os.path.exists(snapspath):
+            if not os.path.exists(snapspath):
+                os.makedirs(snapspath)
+            else:
                 for line in dblist:
                     try:
                         downWindows.setProgress(float(percent * count))
@@ -277,7 +284,6 @@ class FrontendApplication:
     def setGameImage(self, game):
         path = os.path.join(self.configuration["snapsFolder"], game["game_name"])
         if not os.path.exists(path):
-            pix = None
             clone = game["game_cloneof"]
             if clone is not None:
                 result = session.execute(session.query(Game).filter(Game.name == clone))
