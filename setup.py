@@ -1,21 +1,19 @@
-#! /usr/bin/python
-# -*- coding: utf-8 -*-
-from setuptools import setup
-import os.path
+from cx_Freeze import setup, Executable
+
+# Dependencies are automatically detected, but it might need
+# fine tuning.
+buildOptions = dict(packages=[], excludes=[], include_files=['lightningmf_pk/view.ui', 'lightningmf_pk/config.ui', 'lightningmf_pk/logo.svg'])
+
+import sys
+base = 'Win32GUI' if sys.platform == 'win32' else None
+
+executables = [
+    Executable('lightningmf', base=base)
+]
+
 
 setup(name='lightningmf',
-    version='1.0.5',
-    description='Lightning MAME Frontend',
-    author='Nicolas Vanhoren',
-    author_email='nicolas.vanhoren@unknown.com',
-    url='http://lightningmf.neoname.eu/',
-    packages=["lightningmf_pk"],
-    scripts=["lightningmf"],
-    package_data={'lightningmf_pk': ["*.ui", "*.svg", "*.png"]},
-    long_description="Lightning MAME Frontend is a simple and effective MAME Frontend.",
-    keywords="",
-    license="GPLv3",
-    install_requires=[
-        "SqlAlchemy>=1.0.0",
-    ],
-)
+      version='1.0',
+      description='Python MAME frontend',
+      options=dict(build_exe=buildOptions),
+      executables=executables)

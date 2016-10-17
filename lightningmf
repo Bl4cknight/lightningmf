@@ -17,6 +17,7 @@
 
 from PySide import QtGui
 from PySide import QtUiTools
+from PySide import QtXml
 import sys
 import tempfile
 import subprocess
@@ -30,7 +31,12 @@ import requests
 import shutil
 import errno
 
-SCRIPT_ROOT = os.path.dirname(os.path.realpath(__file__)) + "/lightningmf_pk/"
+if getattr(sys, 'frozen', False):
+    # frozen
+    SCRIPT_ROOT = os.path.dirname(sys.executable) + "/lightningmf_pk/"
+else:
+    # unfrozen
+    SCRIPT_ROOT = os.path.dirname(os.path.realpath(__file__)) + "/lightningmf_pk/"
 
 
 # gui
