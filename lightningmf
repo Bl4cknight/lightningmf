@@ -64,10 +64,8 @@ class FrontendApplication:
         finally:
             file.close()
 
-        self.win.move(QtGui.QDesktopWidget().availableGeometry().center() - self.win.geometry().center())
         self.settings = QtCore.QSettings("qsdoiuhvap", "xpoihybao")
-        self.win.restoreGeometry(self.settings.value("geometry"))
-        self.win.show()
+        self.win.showMaximized()
 
         self.model = MyModel()
         self.win.itemsView.setModel(self.model)
@@ -85,13 +83,13 @@ class FrontendApplication:
         self.model.modelReset.connect(set_number)
         set_number()
 
-        self.win.actionRoms.triggered.connect(self.loadRoms)
+        self.win.actionRoms.triggered.connect(self.trueLoadRoms)
 
         self.win.actionMame.triggered.connect(self.configure)
 
         self.win.searchInput.textEdited.connect(self.searchChanged)
 
-        self.win.loadButton.clicked.connect(self.loadRoms)
+        self.win.loadButton.clicked.connect(self.trueLoadRoms)
         self.win.settingsButton.clicked.connect(self.configure)
         self.win.snapsButton.clicked.connect(self.downloadSnaps)
 
@@ -155,15 +153,6 @@ class FrontendApplication:
             session.rollback()
             raise
 
-    def loadRoms(self):
-        try:
-            downWindows = DownloadingWindow('loading roms...')
-            downWindows.show()
-            QtCore.QTimer.singleShot(0, self.trueLoadRoms(downWin=downWindows))
-            downWindows.close()
-        except:
-            pass
-
     def update_db(self):
         rompath = os.path.join(self.configuration["romsFolder"])
 
@@ -185,6 +174,8 @@ class FrontendApplication:
         downWindows = DownloadingWindow('Romlist update...')
         count = 0
         if toremovelist:
+            downWindows.adjustSize()
+            downWindows.move(self.app.desktop().screen().rect().center() - downWindows.rect().center())
             downWindows.show()
             percent = float(100 / len(toremovelist))
         for rom in toremovelist:
@@ -193,10 +184,14 @@ class FrontendApplication:
             session.query(Game).filter(Game.name == rom).delete(synchronize_session=False)
         self.model.modelReset.emit()
 
-    def trueLoadRoms(self, *args, **kwargs):
+    def trueLoadRoms(self):
         filename = tempfile.mktemp()
         rompath = os.path.join(self.configuration["romsFolder"])
         self.update_db()
+        downWindows = DownloadingWindow('loading roms...')
+        downWindows.adjustSize()
+        downWindows.move(self.app.desktop().screen().rect().center() - downWindows.rect().center())
+        downWindows.show()
         # rom on db
         finaldblist = []
         result = session.execute(session.query(Game.name))
@@ -215,9 +210,8 @@ class FrontendApplication:
                     with open(filename, "w") as tmpfile:
                         try:
                             if rom not in finaldblist:
-                                if kwargs:
-                                    kwargs['downWin'].setProgress(float((100 / romCount) * count))
-                                    count += 1
+                                downWindows.setProgress(float((100 / romCount) * count))
+                                count += 1
                                 subprocess.check_call([self.configuration["mameExecutable"], "-listxml", rom],
                                                       stdout=tmpfile, stderr=subprocess.PIPE)
                                 self.parse_elements(filename)
@@ -260,6 +254,8 @@ class FrontendApplication:
         downWindows = DownloadingWindow('Downloading snapshots from mamedb.com')
         count = 0
         if dblist:
+            downWindows.adjustSize()
+            downWindows.move(self.app.desktop().screen().rect().center() - downWindows.rect().center())
             downWindows.show()
             percent = float(100 / len(dblist))
             if not os.path.exists(snapspath):
@@ -366,7 +362,7 @@ class FrontendApplication:
                                                  buttons=QtGui.QMessageBox.Yes | QtGui.QMessageBox.No,
                                                  defaultButton=QtGui.QMessageBox.Yes)
                 if ret == QtGui.QMessageBox.Yes:
-                    QtCore.QTimer.singleShot(0, self.loadRoms)
+                    QtCore.QTimer.singleShot(0, self.trueLoadRoms)
 
         self.confDial.buttonBox.accepted.connect(save)
 

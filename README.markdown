@@ -12,6 +12,8 @@ From the program folder, type:
     ./lightningmf.run
 
 ###Changelog:
+- 1.1
+  - Main window is shown maximized and progressbar widgets are now centered.
 - 1.0.9
   - Created all-in-one executable lightningmf.run using cx_freeze4.3.3 and megastep makeself.
 - 1.0.8
