@@ -18,12 +18,13 @@
 from PySide import QtGui
 from PySide import QtUiTools
 from PySide import QtXml
+import sqlalchemy.sql.default_comparator
 import sys
 import tempfile
 import subprocess
 from lightningmf_pk.KeyFilter import KeyFilter
 from lightningmf_pk.MyModel import *
-from lightningmf_pk.DownloadingWindow import DownloadingWindow
+from lightningmf_pk.ProgressBar import ProgressBar
 import json
 import shlex
 import random
@@ -171,33 +172,38 @@ class FrontendApplication:
         for rom in added_roms:
             if rom in dblist:
                 toremovelist.remove(rom)
-        downWindows = DownloadingWindow('Romlist update...')
         count = 0
         if toremovelist:
-            downWindows.adjustSize()
-            downWindows.move(self.app.desktop().screen().rect().center() - downWindows.rect().center())
-            downWindows.show()
+            downWindow = ProgressBar('Romlist update...')
+            downWindow.adjustSize()
+            downWindow.move(self.app.desktop().screen().rect().center() - downWindow.rect().center())
+            downWindow.show()
             percent = float(100 / len(toremovelist))
-        for rom in toremovelist:
-            downWindows.setProgress(float(percent * count))
-            count += 1
-            session.query(Game).filter(Game.name == rom).delete(synchronize_session=False)
-        self.model.modelReset.emit()
+            for rom in toremovelist:
+                downWindow.setProgress(float(percent * count))
+                count += 1
+                session.query(Game).filter(Game.name == rom).delete(synchronize_session=False)
+            self.model.modelReset.emit()
+            return downWindow
 
     def trueLoadRoms(self):
         filename = tempfile.mktemp()
         rompath = os.path.join(self.configuration["romsFolder"])
-        self.update_db()
-        downWindows = DownloadingWindow('loading roms...')
-        downWindows.adjustSize()
-        downWindows.move(self.app.desktop().screen().rect().center() - downWindows.rect().center())
-        downWindows.show()
+        downWindow = self.update_db()
         # rom on db
         finaldblist = []
         result = session.execute(session.query(Game.name))
         for line in result:
             finaldblist.append(line[0])
         if os.path.exists(rompath):
+            if not downWindow:
+                downWindow = ProgressBar('Loading roms...')
+            else:
+                downWindow.changeLabel('Loading roms...')
+                downWindow.resetProgress()
+            downWindow.adjustSize()
+            downWindow.move(self.app.desktop().screen().rect().center() - downWindow.rect().center())
+            downWindow.show()
             romCount = len([name for name in os.listdir(rompath) if os.path.isfile(os.path.join(rompath, name))])
 
             count = 1
@@ -210,7 +216,7 @@ class FrontendApplication:
                     with open(filename, "w") as tmpfile:
                         try:
                             if rom not in finaldblist:
-                                downWindows.setProgress(float((100 / romCount) * count))
+                                downWindow.setProgress(float((100 / romCount) * count))
                                 count += 1
                                 subprocess.check_call([self.configuration["mameExecutable"], "-listxml", rom],
                                                       stdout=tmpfile, stderr=subprocess.PIPE)
@@ -219,6 +225,7 @@ class FrontendApplication:
                         except Exception:
                             continue
             self.win.statusBar().showMessage("Rom update succeeded", 2000)
+            downWindow.close()
 
     def searchChanged(self, text):
         self.model.searchString = text
@@ -250,20 +257,19 @@ class FrontendApplication:
         result = session.execute(session.query(Game.name))
         for line in result:
             dblist.append(line[0])
-
-        downWindows = DownloadingWindow('Downloading snapshots from mamedb.com')
         count = 0
         if dblist:
-            downWindows.adjustSize()
-            downWindows.move(self.app.desktop().screen().rect().center() - downWindows.rect().center())
-            downWindows.show()
+            downWin = ProgressBar('Downloading snapshots from mamedb.com')
+            downWin.adjustSize()
+            downWin.move(self.app.desktop().screen().rect().center() - downWin.rect().center())
+            downWin.show()
             percent = float(100 / len(dblist))
             if not os.path.exists(snapspath):
                 os.makedirs(snapspath)
             else:
                 for line in dblist:
                     try:
-                        downWindows.setProgress(float(percent * count))
+                        downWin.setProgress(float(percent * count))
                         count += 1
                         filename = snapspath + "/"+line+"/"+line+".png"
                         if not os.path.exists(os.path.dirname(filename)):
@@ -282,6 +288,7 @@ class FrontendApplication:
                                     shutil.copyfileobj(r.raw, f)
                     except:
                         continue
+                downWin.close()
 
     def setGameImage(self, game):
         path = os.path.join(self.configuration["snapsFolder"], game["game_name"])
@@ -326,21 +333,21 @@ class FrontendApplication:
         self.confDial.romsInput.setText(self.configuration["romsFolder"])
 
         def browse():
-            name = QtGui.QFileDialog.getOpenFileName(self.confDial, "Choose MAME Executable")
+            name = QtGui.QFileDialog.getOpenFileName(self.confDial, "Choose MAME Executable", os.path.expanduser("~"))
             if len(name[0]) > 0:
                 self.confDial.mameExecInput.setText(name[0])
 
         self.confDial.browseButton.clicked.connect(browse)
 
         def snapsBrowse():
-            name = QtGui.QFileDialog.getExistingDirectory(self.confDial, "Choose Snapshots Folder")
+            name = QtGui.QFileDialog.getExistingDirectory(self.confDial, "Choose Snapshots Folder", os.path.expanduser("~"))
             if len(name) > 0:
                 self.confDial.snapsInput.setText(name)
 
         self.confDial.snapsButton.clicked.connect(snapsBrowse)
 
         def romsBrowse():
-            name = QtGui.QFileDialog.getExistingDirectory(self.confDial, "Choose Roms Folder")
+            name = QtGui.QFileDialog.getExistingDirectory(self.confDial, "Choose Roms Folder", os.path.expanduser("~"))
             if len(name) > 0:
                 self.confDial.romsInput.setText(name)
 
