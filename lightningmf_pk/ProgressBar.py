@@ -22,7 +22,7 @@ class ProgressBar(QWidget):
         self.progress_bar.setValue(value)
 
     def resetProgress(self):
-        self.progress_bar.reset()
+        self.progress_bar.setValue(0)
 
     def changeLabel(self, new_text):
         self.label.setText(new_text)

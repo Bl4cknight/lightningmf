@@ -70,10 +70,17 @@ class FrontendApplication:
 
         self.model = MyModel()
         self.win.itemsView.setModel(self.model)
-        self.win.itemsView.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
+        self.win.itemsView.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.ResizeToContents)
+        self.win.itemsView.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
+        self.win.itemsView.horizontalHeader().setResizeMode(2, QtGui.QHeaderView.Stretch)
+        self.win.itemsView.horizontalHeader().setResizeMode(3, QtGui.QHeaderView.Stretch)
+        self.win.itemsView.horizontalHeader().setResizeMode(4, QtGui.QHeaderView.Stretch)
+        self.win.itemsView.horizontalHeader().setResizeMode(5, QtGui.QHeaderView.Stretch)
+        self.win.itemsView.setSortingEnabled(True)
         self.win.itemsView.doubleClicked.connect(self.launchGame)
         key_filter.returnPressed.connect(self.launchGame)
         key_filter.escapePressed.connect(self.app.quit)
+        key_filter.ctrlcPressed.connect(self.app.quit)
         x = self.win.itemsView.selectionModel()
         x.selectionChanged.connect(self.selectionChanged)
 
@@ -110,10 +117,11 @@ class FrontendApplication:
                     except:
                         pass
                     self.configure()
+            else:
+                self.trueLoadRoms()
+                # self.win.itemsView.sortByColumn(1, QtCore.Qt.AscendingOrder)
 
-        QtCore.QTimer.singleShot(0, starting)
-
-        self.trueLoadRoms()
+        QtCore.QTimer.singleShot(500, starting)
 
         self.settings.setValue("geometry", self.win.saveGeometry())
 
@@ -129,33 +137,38 @@ class FrontendApplication:
                 event, root = doc.next()
                 num = 0
                 for event, elem in doc:
-                    if event == "end" and elem.tag == "game":
-                        name = elem.get("name")
-                        if not os.path.exists(os.path.join(self.configuration["romsFolder"], name + ".zip")):
+                    if event == "end":
+                        if elem.tag == "machine" or elem.tag == "game":
+                            name = elem.get("name")
+                            if not os.path.exists(os.path.join(self.configuration["romsFolder"], name + ".zip")):
+                                root.clear()
+                                continue
+                            desc = elem.findtext("description") or ""
+                            year = elem.findtext("year") or ""
+                            manu = elem.findtext("manufacturer") or ""
+                            clone = elem.get("cloneof") or None
+                            status = ""
+                            driver = elem.find("driver")
+                            if driver is not None:
+                                status = driver.get("status") or ""
+                            game = Game(name=name, description=desc, year=year, manufacturer=manu, status=status,
+                                        cloneof=clone)
+                            session.add(game)
+                            if num >= 200:
+                                session.commit()
+                                num = 0
                             root.clear()
-                            continue
-                        desc = elem.findtext("description") or ""
-                        year = elem.findtext("year") or ""
-                        manu = elem.findtext("manufacturer") or ""
-                        clone = elem.get("cloneof") or None
-                        status = ""
-                        driver = elem.find("driver")
-                        if driver is not None:
-                            status = driver.get("status") or ""
-                        game = Game(name=name, description=desc, year=year, manufacturer=manu, status=status,
-                                    cloneof=clone)
-                        session.add(game)
-                        if num >= 200:
-                            session.commit()
-                            num = 0
-                        root.clear()
-            session.commit()
+                session.commit()
         except:
             session.rollback()
             raise
 
-    def update_db(self):
+    def trueLoadRoms(self):
+        filename = tempfile.mktemp()
         rompath = os.path.join(self.configuration["romsFolder"])
+        downWindow = ProgressBar('Romlist update...')
+        downWindow.adjustSize()
+        downWindow.move(self.app.desktop().screen().rect().center() - downWindow.rect().center())
 
         # remove from db roms deleted from romsFolder
         added_roms = []
@@ -171,53 +184,49 @@ class FrontendApplication:
         toremovelist = dblist[:]
         for rom in added_roms:
             if rom in dblist:
-                toremovelist.remove(rom)
-        count = 0
+                try:
+                    toremovelist.remove(rom)
+                except ValueError:
+                    print "ValueError with {}".format(rom)
+                    continue
         if toremovelist:
-            downWindow = ProgressBar('Romlist update...')
-            downWindow.adjustSize()
-            downWindow.move(self.app.desktop().screen().rect().center() - downWindow.rect().center())
             downWindow.show()
-            percent = float(100 / len(toremovelist))
+            percent = 100.0 / len(toremovelist)
+            progress = 0.0
             for rom in toremovelist:
-                downWindow.setProgress(float(percent * count))
-                count += 1
+                downWindow.setProgress(progress)
+                progress += percent
                 session.query(Game).filter(Game.name == rom).delete(synchronize_session=False)
             self.model.modelReset.emit()
-            return downWindow
 
-    def trueLoadRoms(self):
-        filename = tempfile.mktemp()
-        rompath = os.path.join(self.configuration["romsFolder"])
-        downWindow = self.update_db()
+        # New Roms Loading
         # rom on db
         finaldblist = []
         result = session.execute(session.query(Game.name))
         for line in result:
             finaldblist.append(line[0])
         if os.path.exists(rompath):
-            if not downWindow:
-                downWindow = ProgressBar('Loading roms...')
-            else:
-                downWindow.changeLabel('Loading roms...')
-                downWindow.resetProgress()
-            downWindow.adjustSize()
-            downWindow.move(self.app.desktop().screen().rect().center() - downWindow.rect().center())
+            downWindow.changeLabel('Loading roms...')
+            downWindow.resetProgress()
             downWindow.show()
+
             romCount = len([name for name in os.listdir(rompath) if os.path.isfile(os.path.join(rompath, name))])
 
-            count = 1
             # print "Rom count: {} dblist: {}".format(romCount, len(finaldblist))
             romCount -= len(finaldblist)
             # print "diff: {}".format(romCount)
+            progress = 0.0
+            percent = 1.0
+            if romCount:
+                percent = 100.0 / romCount
             for root, dirs, files in os.walk(rompath):
                 for rom in files:
                     rom = os.path.splitext(rom)[0]
                     with open(filename, "w") as tmpfile:
                         try:
                             if rom not in finaldblist:
-                                downWindow.setProgress(float((100 / romCount) * count))
-                                count += 1
+                                downWindow.setProgress(progress)
+                                progress += percent
                                 subprocess.check_call([self.configuration["mameExecutable"], "-listxml", rom],
                                                       stdout=tmpfile, stderr=subprocess.PIPE)
                                 self.parse_elements(filename)
@@ -254,41 +263,48 @@ class FrontendApplication:
     def downloadSnaps(self):
         snapspath = os.path.join(self.configuration["snapsFolder"])
         dblist = []
+        downWin = ProgressBar('Downloading snapshots...')
+        downWin.adjustSize()
+        downWin.move(self.app.desktop().screen().rect().center() - downWin.rect().center())
         result = session.execute(session.query(Game.name))
         for line in result:
             dblist.append(line[0])
-        count = 0
+        count = 1
+        notloaded = 0
         if dblist:
-            downWin = ProgressBar('Downloading snapshots from mamedb.com')
-            downWin.adjustSize()
-            downWin.move(self.app.desktop().screen().rect().center() - downWin.rect().center())
             downWin.show()
             percent = float(100 / len(dblist))
             if not os.path.exists(snapspath):
                 os.makedirs(snapspath)
-            else:
-                for line in dblist:
-                    try:
-                        downWin.setProgress(float(percent * count))
-                        count += 1
-                        filename = snapspath + "/"+line+"/"+line+".png"
-                        if not os.path.exists(os.path.dirname(filename)):
+            for line in dblist:
+                try:
+                    downWin.setProgress(float(percent * count))
+                    count += 1
+                    filename = snapspath + "/"+line+"/"+line+".png"
+                    if not os.path.exists(filename):
+                        try:
+                            os.makedirs(os.path.dirname(filename))
+                        except OSError as exc:
+                            # Guard against race condition
+                            if exc.errno != errno.EEXIST:
+                                raise
+                        url = "http://d14730r6ig0f7a.cloudfront.net/img/" + line + ".png"
+                        r = requests.get(url, stream=True)
+                        if r.status_code == 200:
                             try:
-                                os.makedirs(os.path.dirname(filename))
-                            except OSError as exc:
-                                print "OS error"
-                                # Guard against race condition
-                                if exc.errno != errno.EEXIST:
-                                    raise
-                            url = "http://www.mamedb.com/snap/" + line + ".png"
-                            r = requests.get(url, stream=True)
-                            if r.status_code == 200:
                                 with open(filename, 'wb') as f:
                                     r.raw.decode_content = True
                                     shutil.copyfileobj(r.raw, f)
-                    except:
-                        continue
-                downWin.close()
+                            except Exception as ex:
+                                print ex
+
+                        else:
+                            notloaded += 1
+                except Exception as ex:
+                    continue
+        downWin.close()
+        if notloaded:
+            QtGui.QMessageBox.critical(self.win, "Warning", "{} Screenshots not loaded".format(notloaded))
 
     def setGameImage(self, game):
         path = os.path.join(self.configuration["snapsFolder"], game["game_name"])
