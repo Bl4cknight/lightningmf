@@ -10,11 +10,15 @@ sudo apt-get install mame mame-tools
 
 ###To launch:
 
-From the program folder, type:
+From the program folder, launch:
 
     ./lightningmf.run
 
 ###Changelog:
+- 1.1.3
+  - Roms sorting
+  - Improved table layout
+  - Added Ctrl+C KeyEvent
 - 1.1.2
   - Changed snapshots source
   - now compatible with mame 0.179

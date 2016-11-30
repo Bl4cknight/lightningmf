@@ -76,6 +76,8 @@ class MyModel(QtCore.QAbstractTableModel):
         self.cache = {}
         self.count = None
         self.searchString = ""
+        self.order = "description"
+        self.asc_or_desc = "asc"
 
         def reset():
             self.cache = {}
@@ -89,7 +91,7 @@ class MyModel(QtCore.QAbstractTableModel):
         return self.count
 
     def _buildQuery(self, session):
-        return session.query(Game).order_by(Game.description).filter(
+        return session.query(Game).order_by(getattr(getattr(Game, self.order), self.asc_or_desc)()).filter(
             sqlalchemy.or_(Game.description.like("%" + self.searchString + "%"),
                            Game.name.like("%" + self.searchString + "%")))
 
@@ -119,3 +121,12 @@ class MyModel(QtCore.QAbstractTableModel):
             return
         if orientation == QtCore.Qt.Horizontal:
             return MyModel.headers[section][0]
+
+    def sort(self, column=None, direction=None):
+        self.order = self.headers[column][1]
+        if direction == QtCore.Qt.SortOrder.AscendingOrder:
+            self.asc_or_desc = "asc"
+        else:
+            self.asc_or_desc = "desc"
+        self.modelReset.emit()
+        # print 'Model.sort: column: %s, direction: %s' % (column, direction)

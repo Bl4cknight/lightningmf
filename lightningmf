@@ -31,6 +31,8 @@ import random
 import requests
 import shutil
 import errno
+import signal
+
 
 if getattr(sys, 'frozen', False):
     # frozen
@@ -70,13 +72,14 @@ class FrontendApplication:
 
         self.model = MyModel()
         self.win.itemsView.setModel(self.model)
-        self.win.itemsView.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.ResizeToContents)
+        self.win.itemsView.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
         self.win.itemsView.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
         self.win.itemsView.horizontalHeader().setResizeMode(2, QtGui.QHeaderView.Stretch)
         self.win.itemsView.horizontalHeader().setResizeMode(3, QtGui.QHeaderView.Stretch)
         self.win.itemsView.horizontalHeader().setResizeMode(4, QtGui.QHeaderView.Stretch)
-        self.win.itemsView.horizontalHeader().setResizeMode(5, QtGui.QHeaderView.Stretch)
+        self.win.itemsView.horizontalHeader().setResizeMode(5, QtGui.QHeaderView.ResizeToContents)
         self.win.itemsView.setSortingEnabled(True)
+        self.win.itemsView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         self.win.itemsView.doubleClicked.connect(self.launchGame)
         key_filter.returnPressed.connect(self.launchGame)
         key_filter.escapePressed.connect(self.app.quit)
@@ -119,7 +122,7 @@ class FrontendApplication:
                     self.configure()
             else:
                 self.trueLoadRoms()
-                # self.win.itemsView.sortByColumn(1, QtCore.Qt.AscendingOrder)
+                self.win.itemsView.sortByColumn(0, QtCore.Qt.AscendingOrder)
 
         QtCore.QTimer.singleShot(500, starting)
 
@@ -400,6 +403,7 @@ class FrontendApplication:
 
 
 def main():
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
     if len(sys.argv) >= 2 and sys.argv[1] == "-flush":
         drop_db()
     init_db()
