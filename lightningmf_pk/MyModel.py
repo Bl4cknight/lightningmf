@@ -39,8 +39,6 @@ class Game(Base):
     year = Column(String(10), nullable=False)
     manufacturer = Column(String(70), nullable=False)
     status = Column(String(50), nullable=False)
-    cloneof = Column(String(50))
-
 
 # session
 Session = sqlalchemy.orm.sessionmaker(bind=engine, autocommit=True)
@@ -66,7 +64,6 @@ class MyModel(QtCore.QAbstractTableModel):
         2: ("Year", "year"),
         3: ("Manufacturer", "manufacturer"),
         4: ("Status", "status"),
-        5: ("Clone of", "cloneof"),
     }
     items_per_page = 50
     max_pages = 5

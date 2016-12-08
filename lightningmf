@@ -1,7 +1,7 @@
 #! /usr/bin/env python
-#    Lightning MAME Frontend
+#    Lightning MAME Frontend (Bl4cknight version)
 #    Copyright (C) 2012 Nicolas Vanhoren
-#
+#    Forked by Andrea Marino in 2016
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
@@ -16,8 +16,8 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from PySide import QtGui
-from PySide import QtUiTools
 from PySide import QtXml
+from PySide import QtUiTools
 import sqlalchemy.sql.default_comparator
 import sys
 import tempfile
@@ -67,7 +67,7 @@ class FrontendApplication:
         finally:
             file.close()
 
-        self.settings = QtCore.QSettings("qsdoiuhvap", "xpoihybao")
+        self.settings = QtCore.QSettings("bl4cknight", "lightningmf")
         self.win.showMaximized()
 
         self.model = MyModel()
@@ -120,11 +120,8 @@ class FrontendApplication:
                     except:
                         pass
                     self.configure()
-            else:
-                self.trueLoadRoms()
-                self.win.itemsView.sortByColumn(0, QtCore.Qt.AscendingOrder)
 
-        QtCore.QTimer.singleShot(500, starting)
+        QtCore.QTimer.singleShot(0, starting)
 
         self.settings.setValue("geometry", self.win.saveGeometry())
 
@@ -149,13 +146,11 @@ class FrontendApplication:
                             desc = elem.findtext("description") or ""
                             year = elem.findtext("year") or ""
                             manu = elem.findtext("manufacturer") or ""
-                            clone = elem.get("cloneof") or None
                             status = ""
                             driver = elem.find("driver")
                             if driver is not None:
                                 status = driver.get("status") or ""
-                            game = Game(name=name, description=desc, year=year, manufacturer=manu, status=status,
-                                        cloneof=clone)
+                            game = Game(name=name, description=desc, year=year, manufacturer=manu, status=status)
                             session.add(game)
                             if num >= 200:
                                 session.commit()
@@ -311,15 +306,7 @@ class FrontendApplication:
 
     def setGameImage(self, game):
         path = os.path.join(self.configuration["snapsFolder"], game["game_name"])
-        if not os.path.exists(path):
-            clone = game["game_cloneof"]
-            if clone is not None:
-                result = session.execute(session.query(Game).filter(Game.name == clone))
-                result = [dict(x) for x in result]
-                parent = result[0] if len(result) >= 1 else None
-                if parent is not None:
-                    return self.setGameImage(parent)
-        else:
+        if os.path.exists(path):
             try:
                 images_list = []
                 for root, dirs, files in os.walk(path):
