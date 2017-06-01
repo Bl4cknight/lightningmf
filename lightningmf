@@ -267,17 +267,17 @@ class FrontendApplication:
         result = session.execute(session.query(Game.name))
         for line in result:
             dblist.append(line[0])
-        count = 1
         notloaded = 0
         if dblist:
             downWin.show()
-            percent = float(100 / len(dblist))
+            percent = float(100.0 / len(dblist))
+            progress = 0.0
             if not os.path.exists(snapspath):
                 os.makedirs(snapspath)
             for line in dblist:
                 try:
-                    downWin.setProgress(float(percent * count))
-                    count += 1
+                    downWin.setProgress(progress)
+                    progress += percent
                     filename = snapspath + "/"+line+"/"+line+".png"
                     if not os.path.exists(filename):
                         try:
@@ -286,7 +286,7 @@ class FrontendApplication:
                             # Guard against race condition
                             if exc.errno != errno.EEXIST:
                                 raise
-                        url = "http://d14730r6ig0f7a.cloudfront.net/img/" + line + ".png"
+                        url = "http://www.mamedb.org/snaps/" + line + "_K.png"
                         r = requests.get(url, stream=True)
                         if r.status_code == 200:
                             try:
@@ -299,7 +299,7 @@ class FrontendApplication:
                         else:
                             notloaded += 1
                 except Exception as ex:
-                    continue
+                    print ex
         downWin.close()
         if notloaded:
             QtGui.QMessageBox.critical(self.win, "Warning", "{} Screenshots not loaded".format(notloaded))

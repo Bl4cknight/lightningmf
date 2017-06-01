@@ -4,13 +4,13 @@ Lightning MAME Frontend
 This program is a MAME Qt frontend designed for Linux. It was created to be easy to use, be very fast and focus on the essential features.
 Tested with MAME 0.154 and 0.179
 
-###Prerequisites:
+## Prerequisites:
 
     sudo apt-get install mame mame-tools
 
 
-###RUN:
-Standalone multiarch version tested in ubuntu 12.04 and greater (GLIBC >= 2.15):
+## RUN:
+Standalone version tested on ubuntu 16.04 (GLIBC >= 2.23):
 Created with cx-Freeze 4.3.3 and megastep-makeself. Needs qt4 libs installed on system.
 
     sudo chmod 755 lightningmf.run
@@ -21,16 +21,21 @@ Unfrozen version:
     pip install -r requirements.txt
     ./lightningmf
 
-###Save time installing pyside from wheels:
+## Save time installing pyside from wheels:
+
     (x64) pip install wheelhouse/PySide-1.2.4-cp27-cp27mu-linux_x86_64.whl
     (i686)pip install wheelhouse/PySide-1.2.4-cp27-cp27mu-linux_i686.whl
 
-###PySide building system requirements:
+## PySide building system requirements:
 
     sudo apt-get install python-dev cmake qt4-qmake build-essential
     sudo apt-get install libqtcore4 libqt4-dev libqtgui4 qt4-dev-tools
 
-###Changelog:
+## Changelog:
+- 1.1.5 Final
+  - fix snapshot progressbar
+  - add mamedb as images source
+  - new logo
 - 1.1.4 First Release
   - Multiarch standalone version
   - Added requirements.txt
